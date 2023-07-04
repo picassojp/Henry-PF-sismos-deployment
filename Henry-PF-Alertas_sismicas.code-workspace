@@ -1,8 +1,7 @@
 {
 	"folders": [
 		{
-			"name": "Henry-PF-Alertas_sismicas",
-			"path": "../Henry-PF-Alertas_sismicas"
+			"path": "."
 		}
 	],
 	"settings": {}
