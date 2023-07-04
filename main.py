@@ -169,9 +169,6 @@ def main():
 
                 try:
                     # se conecta a MongoDB
-                    # client = MongoClient(f"mongodb+srv://picassojuanpablo:{password}@cluster0.zet6ttc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
-                    # client = MongoClient(f"mongodb+srv://picassojuanpablo:picassjp@cluster0.zet6ttc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
-                    #uri = "mongodb+srv://picassojuanpablo:picassojp@cluster0.zet6ttc.mongodb.net/?retryWrites=true&w=majority"
                     uri = f"mongodb+srv://picassojuanpablo:{password}@cluster0.zet6ttc.mongodb.net/?retryWrites=true&w=majority"
 
                     # Create a new client and connect to the server
