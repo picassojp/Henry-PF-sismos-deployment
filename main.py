@@ -77,7 +77,7 @@ url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 params = {"format": "geojson", "starttime": "2014-01-01", "endtime": "2014-01-31"}
 
 # máximo de registros que la API de USGS devolverá por consulta
-LIMIT = 2000
+LIMIT = 20000
 
 #### funciones del programa
 
@@ -169,7 +169,7 @@ def main():
 
                 try:
                     # se conecta a MongoDB
-                    uri = f"mongodb+srv://picassojuanpablo:{password}@cluster0.zet6ttc.mongodb.net/?retryWrites=true&w=majority"
+                    uri = f"mongodb+srv://picassojp:{password}@cluster0.cchanol.mongodb.net/?retryWrites=true&w=majority"
 
                     # Create a new client and connect to the server
                     client = MongoClient(uri, server_api=ServerApi('1'))
