@@ -1,6 +1,3 @@
 requests
 pandas
 pymongo
-time
-sys
-os
