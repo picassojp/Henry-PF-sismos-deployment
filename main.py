@@ -14,9 +14,6 @@ from datetime import timedelta
 password = os.getenv("MONGODB_PASSWORD")
 print(password)
 
-# se establece el tiempo de la última consulta para iniciar el programa
-last_query_time = "2018-01-01"
-
 # los paises y los estados (USA) que se buscan filtrar
 paises = ["Chile", "Japan"]
 us_estados = [
@@ -78,6 +75,22 @@ params = {"format": "geojson", "starttime": "2014-01-01", "endtime": "2014-01-31
 
 # máximo de registros que la API de USGS devolverá por consulta
 LIMIT = 20000
+
+# Crear un nuevo cliente y conectarse al servidor
+uri = f"mongodb+srv://picassojp:{password}@cluster0.cchanol.mongodb.net/?retryWrites=true&w=majority"
+client = MongoClient(uri, server_api=ServerApi('1'))
+
+db = client["pf-henry"]
+collection = db["api_usgs"]
+collection_meta = db["metadata"]
+
+# Recuperar last_query_time de MongoDB al inicio del programa
+metadata = collection_meta.find_one({"name": "last_query_time"})
+if metadata is not None:
+    last_query_time = metadata["value"]
+else:
+    # En caso de que no exista la metadata en la base de datos, se establece el valor inicial
+    last_query_time = "2018-01-01"
 
 #### funciones del programa
 
@@ -168,16 +181,6 @@ def main():
                 print(df)
 
                 try:
-                    # se conecta a MongoDB
-                    uri = f"mongodb+srv://picassojp:{password}@cluster0.cchanol.mongodb.net/?retryWrites=true&w=majority"
-
-                    # Create a new client and connect to the server
-                    client = MongoClient(uri, server_api=ServerApi('1'))
-                    
-                    #print(client)
-                    db = client["pf-henry"]
-                    collection = db["api_usgs"]
-
                     # se convierte el DataFrame en una lista de diccionarios para que se pueda almacenar en MongoDB
                     data_dict = df.to_dict("records")
 
@@ -204,9 +207,12 @@ def main():
                 # si se han obtenido el máximo número de registros, actualiza el tiempo de inicio y repite el ciclo
                 params["starttime"] = params["endtime"]
 
-        # actualiza el tiempo de la última consulta para la próxima vez
+            # actualiza el tiempo de la última consulta para la próxima vez
             last_query_time = params["endtime"]
             print(last_query_time)
+            
+            # Al final de cada ciclo de consulta, guardar last_query_time en MongoDB
+            collection_meta.update_one({"name": "last_query_time"}, {"$set": {"value": last_query_time}}, upsert=True)
 
         except Exception as e:
             print(f"Error al llamar a la API: {e}", file=sys.stderr)
