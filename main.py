@@ -6,13 +6,14 @@ import time
 import sys
 import os
 from datetime import timedelta
+import re  # importar el módulo re para trabajar con expresiones regulares
 
 
 
 # definición de constantes
 #clave para acceder a mongo
 password = os.getenv("MONGODB_PASSWORD")
-print(password)
+#print(password)
 
 # los paises y los estados (USA) que se buscan filtrar
 paises = ["Chile", "Japan"]
@@ -69,6 +70,13 @@ us_estados = [
     "Wyoming",
 ]
 
+us_state_abbreviations = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+                          "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+                          "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+                          "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                          "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+
+
 # se establece la url y los parámetros de la request
 url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 params = {"format": "geojson", "starttime": "2014-01-01", "endtime": "2014-01-31"}
@@ -92,6 +100,9 @@ else:
     # En caso de que no exista la metadata en la base de datos, se establece el valor inicial
     last_query_time = "2018-01-01"
 
+#variable para pruebas
+# last_query_time = "2018-01-02T13:00:00"
+
 #### funciones del programa
 
 #función para búsqueda de país dentro de las propiedades de la respuesta de la API
@@ -100,10 +111,7 @@ def find_country(place):
     for pais in paises:
         if pais.lower() in place.lower():
             return pais.lower()
-    return next(
-        ("usa" for estado in us_estados if estado.lower() in place.lower()),
-        "other",
-    )
+    return "usa"
 
 def main():
     global last_query_time
@@ -112,73 +120,89 @@ def main():
         try:
             # establece el tiempo de inicio en el tiempo de la última consulta
             params["starttime"] = last_query_time
+            
+            #print(last_query_time)
 
             # calcula el tiempo final como la hora actual
             endtime = pd.Timestamp.now()
 
-            # establece un contador para llevar la cuenta de cuántos registros se han obtenido
-            count = 0
+            # configura el parámetro de finalización para ser una hora después del tiempo de inicio
+            params["endtime"] = (pd.Timestamp(params["starttime"]) + timedelta(hours=1)).isoformat()
 
-            while True:
-                # configura el parámetro de finalización para ser una hora después del tiempo de inicio
-                params["endtime"] = (pd.Timestamp(params["starttime"]) + timedelta(hours=1)).isoformat()
-
-                if pd.Timestamp(params["endtime"]) > endtime:
-                    params["endtime"] = endtime.isoformat()
-
-                # llama a la API
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-
-                # Procesa los datos de la API
-                # se guardan los datos de la consulta a la API
-                data = response.json()
+            if pd.Timestamp(params["endtime"]) > endtime:
+                params["endtime"] = endtime.isoformat()
                 
-                # se toman los datos del diccionario correspondiente
-                features = data["features"]
+            #print(params["endtime"])
 
-                filtered_features = []
+            # llama a la API
+            response = requests.get(url, params=params)
+            response.raise_for_status()
 
-                for feature in features:
-                    place = feature["properties"]["place"]
-                    for location in (
-                        paises + us_estados
-                    ):  # se verifica tanto en países como en estados de EE.UU.
-                        if place and location.lower() in place.lower():
-                            filtered_features.append(feature)
-                            break  # se termina la busqueda buscar en los otros lugares una vez que encontramos una coincidencia
+            # Procesa los datos de la API
+            # se guardan los datos de la consulta a la API
+            data = response.json()
+            
+            # se toman los datos del diccionario correspondiente
+            features = data["features"]
+            
+            #print(features)
 
-                # Ahora 'filtered_features' contiene solo los terremotos que ocurrieron en los países y estados especificados
+            filtered_features = []
 
-                # Crear una lista vacía para almacenar los datos
-                data_list = []
+            for feature in features:
+                if 'place' in feature['properties']:
+                    place = feature['properties']['place']
+                else:
+                    place = None
+                    #print('asigno none a place')
+                for location in (paises + us_estados):  # se verifica tanto en países como en estados de EE.UU.
+                    if place and location.lower() in place.lower():
+                        filtered_features.append(feature)
+                        break  # se termina la busqueda buscar en los otros lugares una vez que encontramos una coincidencia
+                    # buscar la ubicación en los bordes del texto o rodeada por caracteres no alfanuméricos 
+                for location in us_state_abbreviations:
+                    #print('busca por abreviatura')
+                    pattern = r', ' + re.escape(location.lower()) + r'\b' #se buscan las abreviaturas con una coma previa
+                    #print(pattern)
+                    if place and re.search(pattern, place.lower()):
+                        filtered_features.append(feature)
+                        break  # se termina la busqueda en los otros lugares una vez que encontramos una coincidencia
 
-                for feature in filtered_features:
-                    # Extraer información de properties y geometry
-                    properties = feature["properties"]
-                    geometry = feature["geometry"]
+            # Ahora 'filtered_features' contiene solo los terremotos que ocurrieron en los países y estados especificados
 
-                    # Crear un diccionario con los datos que necesitamos
-                    data_dict = {
-                        "id": f"{geometry['coordinates'][0]}_{geometry['coordinates'][1]}_{properties['mag']}_{properties['time']}", #id sintetica
-                        "place": properties["place"],
-                        "mag": properties["mag"],
-                        "time": pd.to_datetime(properties["time"], unit="ms"),  # convertir el tiempo a formato legible
-                        "lon": geometry["coordinates"][0],
-                        "lat": geometry["coordinates"][1],
-                        "depth": geometry["coordinates"][2],
-                    }
+            # Crear una lista vacía para almacenar los datos
+            data_list = []
 
-                    # Añadir el diccionario a la lista
-                    data_list.append(data_dict)
+            for feature in filtered_features:
+                # Extraer información de properties y geometry
+                properties = feature["properties"]
+                geometry = feature["geometry"]
 
-                # Crear un DataFrame a partir de la lista de diccionarios
-                df = pd.DataFrame(data_list)
+                # Crear un diccionario con los datos que necesitamos
+                data_dict = {
+                    "id": f"{geometry['coordinates'][0]}_{geometry['coordinates'][1]}_{properties['mag']}_{properties['time']}", #id sintetica
+                    "place": properties["place"],
+                    "mag": properties["mag"],
+                    "time": pd.to_datetime(properties["time"], unit="ms"),  # convertir el tiempo a formato legible
+                    "time0": properties["time"],  # convertir el tiempo a formato legible
+                    "lon": geometry["coordinates"][0],
+                    "lat": geometry["coordinates"][1],
+                    "depth": geometry["coordinates"][2],
+                }
 
-                # se crea la columna con la denominación de cada país según la columna place
+                # Añadir el diccionario a la lista
+                data_list.append(data_dict)
+
+            # Crear un DataFrame a partir de la lista de diccionarios
+            df = pd.DataFrame(data_list)
+            #print(df)
+            
+            # Verificar si el DataFrame es vacío
+            if not df.empty:
+                # Se crea la columna con la denominación de cada país según la columna place
                 df["country"] = df["place"].apply(find_country)
-                
-                print(df)
+
+                #print(df)
 
                 try:
                     # se convierte el DataFrame en una lista de diccionarios para que se pueda almacenar en MongoDB
@@ -196,20 +220,17 @@ def main():
                 except Exception as e:
                     print(f"Error al conectarse a MongoDB: {e}", file=sys.stderr)
                     
-                # actualiza el contador con el número de registros obtenidos
-                count += len(response.json()["features"])
-
-                # si el número total de registros es inferior al límite, entonces se han obtenido todos los registros
-                # para este intervalo de tiempo y se puede pasar al siguiente intervalo de tiempo
-                if count < LIMIT:
-                    break
-
-                # si se han obtenido el máximo número de registros, actualiza el tiempo de inicio y repite el ciclo
-                params["starttime"] = params["endtime"]
+                # se actualiza el tiempo de inicio y repite el ciclo
+                #params["starttime"] = params["endtime"]
+            
+            else:
+                print("No se encontraron terremotos en las ubicaciones especificadas durante este intervalo de tiempo.")
+                # se actualiza el tiempo de inicio y repite el ciclo
+                #params["starttime"] = params["endtime"]
 
             # actualiza el tiempo de la última consulta para la próxima vez
             last_query_time = params["endtime"]
-            print(last_query_time)
+            #print(last_query_time)
             
             # Al final de cada ciclo de consulta, guardar last_query_time en MongoDB
             collection_meta.update_one({"name": "last_query_time"}, {"$set": {"value": last_query_time}}, upsert=True)
