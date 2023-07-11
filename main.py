@@ -92,16 +92,16 @@ db = client["pf-henry"]
 collection = db["db-pf-henry"]
 collection_meta = db["metadata"]
 
-# Recuperar last_query_time de MongoDB al inicio del programa
-metadata = collection_meta.find_one({"name": "last_query_time"})
-if metadata is not None:
-    last_query_time = metadata["value"]
-else:
-    # En caso de que no exista la metadata en la base de datos, se establece el valor inicial
-    last_query_time = "2018-01-01"
+# # Recuperar last_query_time de MongoDB al inicio del programa
+# metadata = collection_meta.find_one({"name": "last_query_time"})
+# if metadata is not None:
+#     last_query_time = metadata["value"]
+# else:
+#     # En caso de que no exista la metadata en la base de datos, se establece el valor inicial
+#     last_query_time = "2018-01-01"
 
 #variable para pruebas
-# last_query_time = "2018-01-02T13:00:00"
+last_query_time = "2016-01-01"
 
 #### funciones del programa
 
