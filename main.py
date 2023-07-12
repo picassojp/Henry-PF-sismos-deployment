@@ -127,7 +127,7 @@ def main():
             endtime = pd.Timestamp.now()
 
             # configura el parámetro de finalización para ser una hora después del tiempo de inicio
-            params["endtime"] = (pd.Timestamp(params["starttime"]) + timedelta(hours=24)).isoformat()
+            params["endtime"] = (pd.Timestamp(params["starttime"]) + timedelta(hours=1)).isoformat()
 
             if pd.Timestamp(params["endtime"]) > endtime:
                 params["endtime"] = endtime.isoformat()
@@ -239,9 +239,9 @@ def main():
         except Exception as e:
             print(f"Error al llamar a la API: {e}", file=sys.stderr)
 
-        # Espera una hora antes de la próxima iteración
+        # Espera los segundos establecidos antes de la próxima iteración
         # time.sleep(3600)
-        time.sleep(30)
+        time.sleep(15)
 
 
 if __name__ == "__main__":
